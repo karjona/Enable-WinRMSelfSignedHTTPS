@@ -1,0 +1,8 @@
+#$cert = Get-ChildItem -Path Cert:\LocalMachine\My\ | Where-Object FriendlyName -eq 'WinRMHTTPSSelfSignedCert'
+#Remove-Item -Path $cert.PSPath
+$cert = New-SelfSignedCertificate -FriendlyName 'WinRMHTTPSSelfSignedCert' -type SSLServerAuthentication -KeyExportPolicy ExportableEncrypted -Subject "CN=$($env:COMPUTERNAME)" -NotAfter (Get-Date).AddYears(2) -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.1") -CertStoreLocation "cert:\LocalMachine\My" -Provider "Microsoft Software Key Storage Provider" -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256
+Enable-PSRemoting -SkipNetworkProfileCheck -Force
+#Remove-WSManInstance -ResourceURI 'winrm/config/listener' -SelectorSet @{Transport="HTTPS";Address="*"}
+New-WSManInstance -ResourceURI 'winrm/config/listener' -SelectorSet @{Transport="HTTPS";Address="*"} -ValueSet @{Hostname="$($env:COMPUTERNAME)";CertificateThumbprint="$($cert.Thumbprint)"}
+New-NetFirewallRule -DisplayName 'Windows Remote Management (HTTPS-In)' -Name 'WINRM-HTTPS-In-TCP' -Description 'Inbound rule for Windows Remote Management via SSL WS-Management. [TCP 5986]' -Enabled True -Profile Domain,Private -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986
+New-NetFirewallRule -DisplayName 'Windows Remote Management (HTTPS-In)' -Name 'WINRM-HTTPS-In-TCP-NoScope' -Description 'Inbound rule for Windows Remote Management via SSL WS-Management. [TCP 5986]' -Enabled True -Profile Public -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986
